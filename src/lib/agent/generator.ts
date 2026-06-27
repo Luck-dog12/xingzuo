@@ -1,6 +1,135 @@
 import type { GenerationInput, LlmArticleOutput } from "@/lib/agent/schema";
 import { zodiacSigns } from "@/lib/zodiac";
 
+const defaultLlmModel = "agnes-2.0-flash";
+
+type ChatCompletionResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string | null;
+    };
+  }>;
+};
+
+function contentTypeFor(input: GenerationInput) {
+  if (input.generation_type === "daily") return "daily_horoscope";
+  if (input.generation_type === "weekly") return "weekly_horoscope";
+  if (input.generation_type === "monthly") return "monthly_horoscope";
+  if (input.generation_type === "astrology_calendar") return "astrology_calendar";
+  return "zodiac_guide";
+}
+
+function canonicalPathHintFor(input: GenerationInput) {
+  if (input.generation_type === "weekly") {
+    return `/weekly-horoscope/${input.date_range.start}_${input.date_range.end}`;
+  }
+  if (input.generation_type === "monthly") {
+    return `/monthly-horoscope/${input.target_date.slice(0, 7)}`;
+  }
+  if (input.generation_type === "astrology_calendar") {
+    return "/astrology-calendar";
+  }
+  if (input.generation_type === "zodiac_guide") {
+    return "/astrology-guide/[descriptive-slug]";
+  }
+  return `/daily-horoscope/${input.target_date}`;
+}
+
+function buildLlmMessages(input: GenerationInput) {
+  const systemPrompt = [
+    "You are an expert bilingual astrology content editor for a public horoscope website.",
+    "Return only valid JSON. Do not wrap the response in markdown fences or add explanatory text.",
+    "Write original, publishable zh-CN and en-US content for entertainment and reflection.",
+    "Do not make absolute predictions. Do not provide medical, legal, financial, investment, or major life decision advice.",
+    "Use only astrology events present in input. If input.astro_events is empty, do not invent concrete planetary events, retrogrades, full moons, aspects, or transits.",
+    "The Chinese body must include practical reader value and, except for astrology_calendar, all 12 zodiac signs.",
+    "Avoid keyword-stuffing labels such as '关键词：' inside article body content.",
+  ].join("\n");
+
+  const userPrompt = {
+    task: "Generate one complete article JSON object that matches this exact contract.",
+    input,
+    required_output_shape: {
+      generation_type: input.generation_type,
+      article_category: input.article_category,
+      target_date: input.target_date,
+      date_range: input.date_range,
+      article: {
+        title: "string, zh-CN, at least 6 chars",
+        slug: "lowercase URL slug, at least 3 chars",
+        seo_title: "string, zh-CN, at least 6 chars",
+        seo_description: "string, zh-CN, 30-180 chars",
+        excerpt: "string, zh-CN, at least 20 chars",
+        canonical_path: canonicalPathHintFor(input),
+        indexable: true,
+        content_type: contentTypeFor(input),
+        tags: ["string"],
+        body_markdown: "string, zh-CN markdown. daily >= 1200 Chinese chars, weekly >= 2200, monthly >= 2600, astrology_calendar >= 1000.",
+        disclaimer: "string, zh-CN, entertainment/reflection only and not professional advice",
+      },
+      article_en: {
+        title: "string, en-US, at least 6 chars",
+        seo_title: "string, en-US, at least 6 chars",
+        seo_description: "string, en-US, 30-180 chars",
+        excerpt: "string, en-US, at least 20 chars",
+        tags: ["string"],
+        body_markdown: "string, en-US markdown, at least 500 words for horoscope content or 300 words for calendar content",
+        disclaimer: "string, en-US, entertainment/reflection only and not professional advice",
+      },
+      structured_sections: [{ heading: "string", content: "string" }],
+      zodiac_summaries:
+        input.generation_type === "astrology_calendar"
+          ? []
+          : zodiacSigns.map((sign) => ({
+              sign: sign.name,
+              keyword: "string",
+              summary: "string",
+              general: "string",
+              love: "string",
+              career: "string",
+              money: "string",
+              health: "string",
+              advice: "string",
+            })),
+      key_signs: [{ sign: "string", reason: "string" }],
+      internal_links_used: input.internal_links.slice(0, 3),
+      quality_check: {
+        safe_to_publish: true,
+        is_too_thin: false,
+        is_repetitive: false,
+        has_fake_astro_event: false,
+        has_absolute_prediction: false,
+        has_medical_or_financial_advice: false,
+        has_clear_user_value: true,
+        has_disclaimer: true,
+        notes: "string",
+      },
+    },
+  };
+
+  return [
+    { role: "system", content: systemPrompt },
+    { role: "user", content: JSON.stringify(userPrompt) },
+  ];
+}
+
+function parseJsonFromModelContent(content: string) {
+  const trimmed = content.trim();
+  const fenced = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  const jsonText = fenced ? fenced[1] : trimmed;
+
+  try {
+    return JSON.parse(jsonText);
+  } catch (error) {
+    const firstBrace = jsonText.indexOf("{");
+    const lastBrace = jsonText.lastIndexOf("}");
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      return JSON.parse(jsonText.slice(firstBrace, lastBrace + 1));
+    }
+    throw error;
+  }
+}
+
 const disclaimer =
   "本文为十二星座公共运势与娱乐性内容，不构成医疗、投资、法律或重大人生决策建议。";
 const disclaimerEn =
@@ -305,6 +434,7 @@ export async function callConfiguredLlm(input: GenerationInput) {
     return generateFallbackArticle(input);
   }
 
+  const model = process.env.LLM_MODEL || defaultLlmModel;
   const response = await fetch(process.env.LLM_API_URL, {
     method: "POST",
     headers: {
@@ -312,8 +442,9 @@ export async function callConfiguredLlm(input: GenerationInput) {
       authorization: `Bearer ${process.env.LLM_API_KEY}`,
     },
     body: JSON.stringify({
-      input,
-      response_format: "json",
+      model,
+      messages: buildLlmMessages(input),
+      temperature: 0.7,
     }),
   });
 
@@ -321,5 +452,11 @@ export async function callConfiguredLlm(input: GenerationInput) {
     throw new Error(`LLM request failed: ${response.status}`);
   }
 
-  return response.json();
+  const data = (await response.json()) as ChatCompletionResponse;
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) {
+    throw new Error("LLM response did not include choices[0].message.content.");
+  }
+
+  return parseJsonFromModelContent(content);
 }

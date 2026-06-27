@@ -2,6 +2,7 @@ import type { GenerationInput, LlmArticleOutput } from "@/lib/agent/schema";
 import { zodiacSigns } from "@/lib/zodiac";
 
 const defaultLlmModel = "agnes-2.0-flash";
+const defaultLlmMaxTokens = 8000;
 
 type ChatCompletionResponse = {
   choices?: Array<{
@@ -46,70 +47,26 @@ function buildLlmMessages(input: GenerationInput) {
     "Avoid keyword-stuffing labels such as '关键词：' inside article body content.",
   ].join("\n");
 
-  const userPrompt = {
-    task: "Generate one complete article JSON object that matches this exact contract.",
-    input,
-    required_output_shape: {
-      generation_type: input.generation_type,
-      article_category: input.article_category,
-      target_date: input.target_date,
-      date_range: input.date_range,
-      article: {
-        title: "string, zh-CN, at least 6 chars",
-        slug: "lowercase URL slug, at least 3 chars",
-        seo_title: "string, zh-CN, at least 6 chars",
-        seo_description: "string, zh-CN, 30-180 chars",
-        excerpt: "string, zh-CN, at least 20 chars",
-        canonical_path: canonicalPathHintFor(input),
-        indexable: true,
-        content_type: contentTypeFor(input),
-        tags: ["string"],
-        body_markdown: "string, zh-CN markdown. daily >= 1200 Chinese chars, weekly >= 2200, monthly >= 2600, astrology_calendar >= 1000.",
-        disclaimer: "string, zh-CN, entertainment/reflection only and not professional advice",
-      },
-      article_en: {
-        title: "string, en-US, at least 6 chars",
-        seo_title: "string, en-US, at least 6 chars",
-        seo_description: "string, en-US, 30-180 chars",
-        excerpt: "string, en-US, at least 20 chars",
-        tags: ["string"],
-        body_markdown: "string, en-US markdown, at least 500 words for horoscope content or 300 words for calendar content",
-        disclaimer: "string, en-US, entertainment/reflection only and not professional advice",
-      },
-      structured_sections: [{ heading: "string", content: "string" }],
-      zodiac_summaries:
-        input.generation_type === "astrology_calendar"
-          ? []
-          : zodiacSigns.map((sign) => ({
-              sign: sign.name,
-              keyword: "string",
-              summary: "string",
-              general: "string",
-              love: "string",
-              career: "string",
-              money: "string",
-              health: "string",
-              advice: "string",
-            })),
-      key_signs: [{ sign: "string", reason: "string" }],
-      internal_links_used: input.internal_links.slice(0, 3),
-      quality_check: {
-        safe_to_publish: true,
-        is_too_thin: false,
-        is_repetitive: false,
-        has_fake_astro_event: false,
-        has_absolute_prediction: false,
-        has_medical_or_financial_advice: false,
-        has_clear_user_value: true,
-        has_disclaimer: true,
-        notes: "string",
-      },
-    },
-  };
+  const zodiacList = zodiacSigns.map((sign) => sign.name).join(", ");
+  const userPrompt = [
+    "Generate one complete JSON object for this input:",
+    JSON.stringify(input),
+    "",
+    "Top-level keys: generation_type, article_category, target_date, date_range, article, article_en, structured_sections, zodiac_summaries, key_signs, internal_links_used, quality_check.",
+    `article.canonical_path must be ${canonicalPathHintFor(input)}. article.content_type must be ${contentTypeFor(input)}.`,
+    "article keys: title, slug, seo_title, seo_description, excerpt, canonical_path, indexable, content_type, tags, body_markdown, disclaimer.",
+    "article_en keys: title, seo_title, seo_description, excerpt, tags, body_markdown, disclaimer.",
+    "quality_check keys: safe_to_publish, is_too_thin, is_repetitive, has_fake_astro_event, has_absolute_prediction, has_medical_or_financial_advice, has_clear_user_value, has_disclaimer, notes.",
+    "For daily/weekly/monthly/zodiac_guide, zodiac_summaries must contain one object per sign with keys: sign, keyword, summary, general, love, career, money, health, advice.",
+    `Use these signs in order: ${zodiacList}.`,
+    "For astrology_calendar, zodiac_summaries can be empty.",
+    "Chinese body_markdown minimum: daily 1000 chars, weekly 1800, monthly 2200, astrology_calendar 900. English body_markdown minimum: 300 chars.",
+    "Use markdown headings in body_markdown. Return JSON only.",
+  ].join("\n");
 
   return [
     { role: "system", content: systemPrompt },
-    { role: "user", content: JSON.stringify(userPrompt) },
+    { role: "user", content: userPrompt },
   ];
 }
 
@@ -435,6 +392,7 @@ export async function callConfiguredLlm(input: GenerationInput) {
   }
 
   const model = process.env.LLM_MODEL || defaultLlmModel;
+  const maxTokens = Number(process.env.LLM_MAX_TOKENS || defaultLlmMaxTokens);
   const response = await fetch(process.env.LLM_API_URL, {
     method: "POST",
     headers: {
@@ -445,11 +403,13 @@ export async function callConfiguredLlm(input: GenerationInput) {
       model,
       messages: buildLlmMessages(input),
       temperature: 0.7,
+      max_tokens: Number.isFinite(maxTokens) ? maxTokens : defaultLlmMaxTokens,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`LLM request failed: ${response.status}`);
+    const body = await response.text().catch(() => "");
+    throw new Error(`LLM request failed: ${response.status}${body ? ` ${body.slice(0, 500)}` : ""}`);
   }
 
   const data = (await response.json()) as ChatCompletionResponse;

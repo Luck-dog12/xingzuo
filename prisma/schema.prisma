@@ -1,0 +1,332 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ArticleStatus {
+  draft
+  generated
+  checked
+  approved
+  scheduled
+  published
+  rejected
+  rewrite_required
+  archived
+}
+
+enum ContentType {
+  daily_horoscope
+  weekly_horoscope
+  monthly_horoscope
+  zodiac_guide
+  astrology_guide
+  astrology_calendar
+  basic_page
+}
+
+enum RiskLevel {
+  low
+  medium
+  high
+  blocking
+}
+
+enum JobStatus {
+  queued
+  running
+  completed
+  failed
+  rewrite_required
+  rejected
+}
+
+enum AdminRole {
+  owner
+  editor
+  viewer
+}
+
+enum AstroEventStatus {
+  pending
+  approved
+  rejected
+}
+
+model Article {
+  id                String              @id @default(cuid())
+  title             String
+  titleEn           String?             @map("title_en")
+  slug              String              @unique
+  seoTitle          String              @map("seo_title")
+  seoTitleEn        String?             @map("seo_title_en")
+  seoDescription    String              @map("seo_description")
+  seoDescriptionEn  String?             @map("seo_description_en")
+  excerpt           String
+  excerptEn         String?             @map("excerpt_en")
+  bodyMarkdown      String              @map("body_markdown")
+  bodyMarkdownEn    String?             @map("body_markdown_en")
+  contentType       ContentType         @map("content_type")
+  articleCategory   String              @map("article_category")
+  targetDate        DateTime?           @map("target_date") @db.Date
+  dateRangeStart    DateTime?           @map("date_range_start") @db.Date
+  dateRangeEnd      DateTime?           @map("date_range_end") @db.Date
+  canonicalPath     String              @unique @map("canonical_path")
+  indexable         Boolean             @default(false)
+  status            ArticleStatus       @default(draft)
+  qualityScore      Int                 @default(0) @map("quality_score")
+  riskLevel         RiskLevel           @default(medium) @map("risk_level")
+  sourceAstroEvents Json?               @map("source_astro_events")
+  tags              String[]            @default([])
+  tagsEn            String[]            @default([]) @map("tags_en")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  publishedAt       DateTime?           @map("published_at")
+
+  zodiacSummaries   ZodiacSummary[]
+  qualityChecks     QualityCheck[]
+  versions          ArticleVersion[]
+  astroEvents       ArticleAstroEvent[]
+
+  @@index([contentType, status])
+  @@index([targetDate])
+  @@index([dateRangeStart, dateRangeEnd])
+  @@unique([contentType, targetDate])
+  @@map("articles")
+}
+
+model ZodiacSummary {
+  id        String   @id @default(cuid())
+  articleId String   @map("article_id")
+  sign      String
+  keyword   String
+  summary   String
+  general   String?
+  love      String?
+  career    String?
+  money     String?
+  health    String?
+  advice    String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, sign])
+  @@map("zodiac_summaries")
+}
+
+model AstroEvent {
+  id          String   @id @default(cuid())
+  eventKey    String   @unique @default(cuid()) @map("event_key")
+  date        DateTime @db.Date
+  eventType   String   @map("event_type")
+  planet1     String?  @map("planet_1")
+  planet2     String?  @map("planet_2")
+  sign        String?
+  aspect      String?
+  description String
+  source      String
+  status      AstroEventStatus @default(approved)
+  reviewedAt  DateTime? @map("reviewed_at")
+  reviewedBy  String?   @map("reviewed_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  articles ArticleAstroEvent[]
+
+  @@index([date, status])
+  @@map("astro_events")
+}
+
+model ArticleAstroEvent {
+  articleId    String @map("article_id")
+  astroEventId String @map("astro_event_id")
+
+  article    Article    @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  astroEvent AstroEvent @relation(fields: [astroEventId], references: [id], onDelete: Cascade)
+
+  @@id([articleId, astroEventId])
+  @@map("article_astro_events")
+}
+
+model InternalLink {
+  id        String   @id @default(cuid())
+  anchor    String
+  url       String
+  category  String
+  priority  Int      @default(0)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([category, isActive])
+  @@map("internal_links")
+}
+
+model GenerationJob {
+  id             String    @id @default(cuid())
+  jobType        String    @map("job_type")
+  targetDate     DateTime? @map("target_date") @db.Date
+  dateRangeStart DateTime? @map("date_range_start") @db.Date
+  dateRangeEnd   DateTime? @map("date_range_end") @db.Date
+  status         JobStatus @default(queued)
+  idempotencyKey String    @unique @map("idempotency_key")
+  inputPayload   Json      @map("input_payload")
+  llmOutput      Json?     @map("llm_output")
+  errorMessage   String?   @map("error_message")
+  attempts       Int       @default(0)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+  completedAt    DateTime? @map("completed_at")
+
+  @@index([jobType, status])
+  @@map("generation_jobs")
+}
+
+model QualityCheck {
+  id                          String   @id @default(cuid())
+  articleId                   String   @map("article_id")
+  isTooThin                   Boolean  @default(false) @map("is_too_thin")
+  isRepetitive                Boolean  @default(false) @map("is_repetitive")
+  hasFakeAstroEvent           Boolean  @default(false) @map("has_fake_astro_event")
+  hasAbsolutePrediction       Boolean  @default(false) @map("has_absolute_prediction")
+  hasMedicalOrFinancialAdvice Boolean  @default(false) @map("has_medical_or_financial_advice")
+  hasDisclaimer               Boolean  @default(false) @map("has_disclaimer")
+  hasClearUserValue           Boolean  @default(false) @map("has_clear_user_value")
+  safeToPublish               Boolean  @default(false) @map("safe_to_publish")
+  score                       Int      @default(0)
+  notes                       String
+  createdAt                   DateTime @default(now()) @map("created_at")
+  updatedAt                   DateTime @updatedAt @map("updated_at")
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@map("quality_checks")
+}
+
+model ArticleVersion {
+  id           String   @id @default(cuid())
+  articleId    String   @map("article_id")
+  title        String
+  bodyMarkdown String   @map("body_markdown")
+  editorEmail  String?  @map("editor_email")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  article Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId])
+  @@map("article_versions")
+}
+
+model SitePage {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  seoTitle       String   @map("seo_title")
+  seoDescription String   @map("seo_description")
+  bodyMarkdown   String   @map("body_markdown")
+  indexable      Boolean  @default(true)
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("site_pages")
+}
+
+model AdSlot {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  label       String
+  placement   String
+  enabled     Boolean  @default(false)
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("ad_slots")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorEmail String?  @map("actor_email")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String?  @map("entity_id")
+  metadata   Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+model CronRun {
+  id           String    @id @default(cuid())
+  jobName      String    @map("job_name")
+  status       String
+  startedAt    DateTime  @default(now()) @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  errorMessage String?   @map("error_message")
+  metadata     Json?
+
+  @@index([jobName, startedAt])
+  @@map("cron_runs")
+}
+
+model AdminUser {
+  id        String    @id @default(cuid())
+  email     String    @unique
+  role      AdminRole @default(editor)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@map("admin_users")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

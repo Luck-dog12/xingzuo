@@ -1,0 +1,162 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8f4ee;
+  --foreground: #211c18;
+  --muted: #776e64;
+  --line: #ddd1c1;
+  --teal: #0a8179;
+  --coral: #bd4f3f;
+  --saffron: #c18221;
+  --ink: #132c2a;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+body::before {
+  background:
+    linear-gradient(rgba(19, 44, 42, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(19, 44, 42, 0.045) 1px, transparent 1px);
+  background-size: 44px 44px;
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: -1;
+}
+
+::selection {
+  background: #cfe8e4;
+  color: #102421;
+}
+
+.i18n-en,
+.i18n-block-en {
+  display: none;
+}
+
+html[data-locale="en"] .i18n-zh,
+html[data-locale="en"] .i18n-block-zh {
+  display: none !important;
+}
+
+html[data-locale="en"] .i18n-en {
+  display: inline;
+}
+
+html[data-locale="en"] .i18n-block-en {
+  display: block;
+}
+
+.markdown-content {
+  color: #2c2925;
+  font-size: 1.03rem;
+  line-height: 1.95;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  color: #1f1d1b;
+  font-weight: 750;
+  line-height: 1.25;
+  scroll-margin-top: 6rem;
+}
+
+.markdown-content h1 {
+  font-size: clamp(2rem, 4vw, 3.35rem);
+  margin-bottom: 1.25rem;
+}
+
+.markdown-content h2 {
+  border-bottom: 1px solid var(--line);
+  font-size: clamp(1.35rem, 2vw, 1.8rem);
+  margin-top: 2.5rem;
+  padding-bottom: 0.6rem;
+}
+
+.markdown-content h3 {
+  color: var(--teal);
+  font-size: 1.12rem;
+  margin-top: 1.8rem;
+}
+
+.markdown-content p {
+  margin: 1rem 0;
+}
+
+.markdown-content a {
+  color: var(--teal);
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  margin: 1rem 0;
+  padding-left: 1.4rem;
+}
+
+.markdown-content-dark {
+  color: rgba(248, 244, 238, 0.82);
+}
+
+.markdown-content-dark h1,
+.markdown-content-dark h2,
+.markdown-content-dark h3 {
+  color: #fff8e7;
+}
+
+.markdown-content-dark h2 {
+  border-bottom-color: rgba(240, 201, 106, 0.26);
+}
+
+.markdown-content-dark h3 {
+  color: #f0c96a;
+}
+
+.markdown-content-dark a {
+  color: #8ee7d9;
+}
+
+.markdown-content-dark strong {
+  color: #ffffff;
+}
+
+.markdown-content-dark li::marker {
+  color: #f0c96a;
+}
+
+.star-field {
+  background:
+    linear-gradient(90deg, rgba(19, 44, 42, 0.84), rgba(19, 44, 42, 0.52) 45%, rgba(19, 44, 42, 0.12)),
+    linear-gradient(180deg, rgba(19, 44, 42, 0.42), rgba(248, 244, 238, 0.34)),
+    url("/zodiac-wheel.svg");
+  background-position: center;
+  background-size: cover;
+}
+
+.eyebrow {
+  color: var(--saffron);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.soft-panel {
+  background: rgba(255, 255, 255, 0.82);
+  border: 1px solid rgba(221, 209, 193, 0.9);
+  box-shadow: 0 18px 60px rgba(31, 29, 27, 0.08);
+}

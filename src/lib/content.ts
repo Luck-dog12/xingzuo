@@ -1,7 +1,10 @@
 import { unstable_noStore as noStore } from "next/cache";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
 import type { Article as PrismaArticle, ZodiacSummary } from "@prisma/client";
 import { getPrisma } from "@/lib/prisma";
 import { fallbackArticles, fallbackSitePages } from "@/lib/static-content";
+import { getShanghaiToday } from "@/lib/dates";
 import type { ArticleStatus, ArticleView, ContentType, RiskLevel, SitePageView } from "@/lib/types";
 
 type PrismaArticleWithSummaries = PrismaArticle & {
@@ -43,11 +46,55 @@ function mapArticle(article: PrismaArticleWithSummaries): ArticleView {
   };
 }
 
+function getLocalGeneratedDailyArticle(): ArticleView | null {
+  const today = getShanghaiToday();
+  const generatedPath = path.join(process.cwd(), "generated", `daily-horoscope-${today}-agent.md`);
+  if (!existsSync(generatedPath)) return null;
+
+  const bodyMarkdown = readFileSync(generatedPath, "utf8");
+  const title = bodyMarkdown.match(/^#\s+(.+)$/m)?.[1] ?? `${today} 十二星座今日运势`;
+
+  return {
+    id: `local-generated-daily-${today}`,
+    title,
+    titleEn: `${today} Daily Horoscope for the 12 Zodiac Signs`,
+    slug: `daily-${today}`,
+    seoTitle: title,
+    seoTitleEn: `${today} Daily Horoscope for the 12 Zodiac Signs`,
+    seoDescription: `${today} 十二星座今日运势，包含整体氛围与白羊座到双鱼座的综合、关系和行动建议。`,
+    seoDescriptionEn: `${today} daily horoscope for the 12 zodiac signs with practical reflection prompts.`,
+    excerpt: "今日适合把注意力放回沟通、关系节奏和小步行动，温和观察自己的状态。",
+    excerptEn: "A gentle daily horoscope for reflection, communication, and practical next steps.",
+    bodyMarkdown,
+    bodyMarkdownEn: null,
+    contentType: "daily_horoscope",
+    articleCategory: "daily_horoscope",
+    targetDate: new Date(`${today}T00:00:00+08:00`),
+    dateRangeStart: new Date(`${today}T00:00:00+08:00`),
+    dateRangeEnd: new Date(`${today}T00:00:00+08:00`),
+    canonicalPath: `/daily-horoscope/${today}`,
+    indexable: true,
+    status: "published",
+    qualityScore: 90,
+    riskLevel: "low",
+    tags: ["十二星座", "今日运势", "AI生成"],
+    tagsEn: ["12 Zodiac Signs", "Daily Horoscope", "AI Generated"],
+    publishedAt: new Date(),
+    zodiacSummaries: [],
+  };
+}
+
+function getFallbackArticlesWithLocalGenerated() {
+  const localDaily = getLocalGeneratedDailyArticle();
+  if (!localDaily) return fallbackArticles;
+  return [localDaily, ...fallbackArticles.filter((article) => article.canonicalPath !== localDaily.canonicalPath)];
+}
+
 export async function getPublishedArticles(contentType?: ContentType, limit = 12) {
   const prisma = getPrisma();
 
   if (!prisma) {
-    return fallbackArticles
+    return getFallbackArticlesWithLocalGenerated()
       .filter((article) => !contentType || article.contentType === contentType)
       .slice(0, limit);
   }
@@ -74,7 +121,7 @@ export async function getArticleByCanonicalPath(path: string) {
   const prisma = getPrisma();
 
   if (!prisma) {
-    return fallbackArticles.find((article) => article.canonicalPath === path) ?? null;
+    return getFallbackArticlesWithLocalGenerated().find((article) => article.canonicalPath === path) ?? null;
   }
 
   const article = await prisma.article.findFirst({
@@ -92,7 +139,7 @@ export async function getArticleBySlug(slug: string) {
   const prisma = getPrisma();
 
   if (!prisma) {
-    return fallbackArticles.find((article) => article.slug === slug) ?? null;
+    return getFallbackArticlesWithLocalGenerated().find((article) => article.slug === slug) ?? null;
   }
 
   const article = await prisma.article.findFirst({
@@ -120,7 +167,7 @@ export async function getAdminArticles() {
   noStore();
   const prisma = getPrisma();
   if (!prisma) {
-    return fallbackArticles;
+    return getFallbackArticlesWithLocalGenerated();
   }
 
   const articles = await prisma.article.findMany({

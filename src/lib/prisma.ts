@@ -6,6 +6,9 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 export function hasDatabaseUrl() {
+  if (process.env.DISABLE_DATABASE === "1") {
+    return false;
+  }
   return Boolean(process.env.DATABASE_URL);
 }
 

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { CalendarDays, Moon, Orbit, Sparkles } from "lucide-react";
+import { calculateAstroEventCandidates } from "@/lib/astro-event-importer";
 import { getMonthKey } from "@/lib/dates";
 import { getPrisma } from "@/lib/prisma";
 
@@ -136,12 +137,24 @@ export default async function AstrologyCalendarPage() {
 
 async function getMonthEvents(monthKey: string): Promise<CalendarEvent[]> {
   const prisma = getPrisma();
-  if (!prisma) return [];
 
   const start = new Date(`${monthKey}-01T00:00:00+08:00`);
   const end = new Date(start);
   end.setMonth(end.getMonth() + 1);
   end.setDate(0);
+
+  if (!prisma) {
+    return calculateAstroEventCandidates(`${monthKey}-01`, toKey(end)).map((event) => ({
+      id: event.eventKey,
+      date: event.date,
+      eventType: event.eventType,
+      description: event.description,
+      planet1: event.planet1,
+      planet2: event.planet2,
+      sign: event.sign,
+      aspect: event.aspect,
+    }));
+  }
 
   return prisma.astroEvent.findMany({
     where: { status: "approved", date: { gte: start, lte: end } },

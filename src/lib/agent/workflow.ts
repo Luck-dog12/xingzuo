@@ -4,7 +4,7 @@ import {
   ContentType as PrismaContentType,
   RiskLevel as PrismaRiskLevel,
 } from "@prisma/client";
-import { callConfiguredLlm } from "@/lib/agent/generator";
+import { callConfiguredLlm, generateFallbackArticle } from "@/lib/agent/generator";
 import {
   generationInputSchema,
   llmArticleOutputSchema,
@@ -183,7 +183,10 @@ export async function runGenerationWorkflow(jobType: GenerationJobType) {
 
   try {
     const rawOutput = await callConfiguredLlm(input);
-    const output = llmArticleOutputSchema.parse(rawOutput);
+    const parsedOutput = llmArticleOutputSchema.safeParse(rawOutput);
+    const output = parsedOutput.success
+      ? parsedOutput.data
+      : llmArticleOutputSchema.parse(generateFallbackArticle(input));
     const quality = evaluateArticleQuality(output, input);
     const status = statusForScore(quality.score, quality.safeToPublish);
     const prismaContentType = output.article.content_type as PrismaContentType;

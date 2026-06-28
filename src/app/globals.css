@@ -22,6 +22,11 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+main {
+  min-width: 0;
 }
 
 body::before {
@@ -145,6 +150,33 @@ html[data-locale="en"] .i18n-block-en {
     url("/zodiac-wheel.svg");
   background-position: center;
   background-size: cover;
+}
+
+.login-orbit {
+  background:
+    linear-gradient(90deg, rgba(8, 22, 24, 0.96), rgba(19, 44, 42, 0.72) 50%, rgba(19, 44, 42, 0.3)),
+    url("/zodiac-wheel.svg");
+  background-position: center;
+  background-size: cover;
+}
+
+.login-orbit::before {
+  background:
+    radial-gradient(circle at 18% 24%, rgba(240, 201, 106, 0.18) 0 1px, transparent 2px),
+    radial-gradient(circle at 74% 32%, rgba(142, 231, 217, 0.2) 0 1px, transparent 2px),
+    radial-gradient(circle at 58% 70%, rgba(255, 248, 231, 0.16) 0 1px, transparent 2px),
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size:
+    180px 180px,
+    220px 220px,
+    260px 260px,
+    52px 52px,
+    52px 52px;
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
 }
 
 .eyebrow {

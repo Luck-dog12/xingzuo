@@ -10,7 +10,7 @@ export async function getAdminSession() {
 export async function requireAdmin() {
   const session = await getAdminSession();
   if (!session?.user?.email) {
-    redirect("/api/auth/signin?callbackUrl=/admin");
+    redirect("/login?callbackUrl=/admin");
   }
   return session;
 }

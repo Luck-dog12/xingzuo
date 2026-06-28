@@ -1,5 +1,44 @@
 import { z } from "zod";
 
+const sectionSchema = z.object({
+  heading: z.string(),
+  content: z.string(),
+});
+
+const keySignSchema = z.object({
+  sign: z.string(),
+  reason: z.string(),
+});
+
+function normalizeStructuredSections(value: unknown) {
+  if (Array.isArray(value)) return value;
+
+  if (value && typeof value === "object") {
+    return Object.entries(value).map(([heading, content]) => ({
+      heading,
+      content:
+        typeof content === "string"
+          ? content
+          : content && typeof content === "object" && "content" in content
+            ? String((content as { content: unknown }).content)
+            : JSON.stringify(content),
+    }));
+  }
+
+  return [];
+}
+
+function normalizeKeySigns(value: unknown) {
+  if (!Array.isArray(value)) return [];
+
+  return value.map((item) => {
+    if (typeof item === "string") {
+      return { sign: item, reason: "模型未提供原因，需人工复核。" };
+    }
+    return item;
+  });
+}
+
 export const generationTypeSchema = z.enum([
   "daily",
   "weekly",
@@ -86,12 +125,7 @@ export const llmArticleOutputSchema = z.object({
     body_markdown: z.string().min(300),
     disclaimer: z.string().min(20),
   }),
-  structured_sections: z.array(
-    z.object({
-      heading: z.string(),
-      content: z.string(),
-    }),
-  ),
+  structured_sections: z.preprocess(normalizeStructuredSections, z.array(sectionSchema)),
   zodiac_summaries: z.array(
     z.object({
       sign: z.string(),
@@ -105,12 +139,7 @@ export const llmArticleOutputSchema = z.object({
       advice: z.string(),
     }),
   ),
-  key_signs: z.array(
-    z.object({
-      sign: z.string(),
-      reason: z.string(),
-    }),
-  ),
+  key_signs: z.preprocess(normalizeKeySigns, z.array(keySignSchema)),
   internal_links_used: z.array(
     z.object({
       anchor: z.string(),

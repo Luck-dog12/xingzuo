@@ -25,8 +25,8 @@ export function getAuthOptions(): NextAuthOptions {
       }),
     ],
     pages: {
-      signIn: "/api/auth/signin",
-      verifyRequest: "/admin/check-email",
+      signIn: "/login",
+      verifyRequest: "/check-email",
     },
     callbacks: {
       async signIn({ user }) {

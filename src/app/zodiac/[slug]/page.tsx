@@ -76,16 +76,32 @@ ${sign.name}适合把自身节奏转化为可执行的工作方法。建议关�
           <ArrowLeft className="size-4" aria-hidden />
           返回十二星座百科
         </Link>
-        <div className="mt-6 grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-          <ZodiacConstellation
-            sign={sign}
-            className="rounded-md border border-white/12 shadow-[0_24px_90px_rgba(0,0,0,.34)] lg:sticky lg:top-28"
-          />
-          <article className="relative overflow-hidden rounded-md border border-white/12 bg-[linear-gradient(145deg,rgba(10,18,39,.94),rgba(20,29,58,.92)_48%,rgba(33,24,49,.94))] p-6 shadow-[0_24px_90px_rgba(0,0,0,.34)] sm:p-9">
+        <div className="mt-6 space-y-6">
+          <section className="overflow-hidden rounded-md border border-white/12 bg-[#090d1d] shadow-[0_24px_90px_rgba(0,0,0,.34)]">
+            <ZodiacConstellation sign={sign} className="aspect-[16/9] min-h-[320px] sm:aspect-[21/9] lg:min-h-[420px]" />
+            <div className="grid gap-4 border-t border-white/12 bg-[linear-gradient(135deg,rgba(10,18,39,.96),rgba(20,29,58,.94))] p-5 text-white sm:grid-cols-3 sm:p-6">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#f0c96a]">Date Range</p>
+                <p className="mt-2 text-lg font-semibold">{sign.dateRange}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#f0c96a]">Element</p>
+                <p className="mt-2 text-lg font-semibold">{sign.element}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[.18em] text-[#f0c96a]">Profile</p>
+                <p className="mt-2 text-lg font-semibold">
+                  {sign.englishName} / {sign.shortName}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <article className="relative overflow-hidden rounded-md border border-white/12 bg-[linear-gradient(145deg,rgba(10,18,39,.94),rgba(20,29,58,.92)_48%,rgba(33,24,49,.94))] px-5 py-7 shadow-[0_24px_90px_rgba(0,0,0,.34)] sm:px-8 sm:py-9 lg:px-12">
             <div className="pointer-events-none absolute right-8 top-8 size-28 rounded-full border border-[#f0c96a]/18" />
             <div className="pointer-events-none absolute right-20 top-20 size-1.5 rounded-full bg-white/70" />
             <div className="pointer-events-none absolute left-10 top-14 size-1 rounded-full bg-white/60" />
-            <div className="relative">
+            <div className="relative mx-auto max-w-4xl">
               <MarkdownContent content={markdown} tone="dark" />
             </div>
           </article>
